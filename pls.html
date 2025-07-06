@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vocabulary Matching Game</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 10px; /* ลด padding เพื่อให้มีพื้นที่มากขึ้นบนมือถือ */
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%; /* ใช้ความกว้างเต็มที่ */
+            max-width: 600px; /* จำกัดความกว้างสูงสุดสำหรับจอใหญ่ */
+            margin: 10px auto; /* ลด margin */
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 15px; /* ลด padding */
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            box-sizing: border-box; /* สำคัญเพื่อให้ padding ไม่ดันขนาดออกไป */
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 1.8em; /* ปรับขนาดฟอนต์ */
+            margin-bottom: 8px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .score-board {
+            display: flex;
+            justify-content: center;
+            gap: 10px; /* ลด gap */
+            margin-bottom: 15px;
+            font-size: 0.9em; /* ปรับขนาดฟอนต์ */
+            font-weight: bold;
+            flex-wrap: wrap; /* ให้ขึ้นบรรทัดใหม่ได้ */
+        }
+
+        .score-item {
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            color: white;
+            padding: 6px 12px; /* ลด padding */
+            border-radius: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        
+        /* New style for the timer display */
+        .timer-item {
+            background: linear-gradient(45deg, #3498db, #2ecc71); /* Blue-green gradient */
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        .game-area {
+            display: grid;
+            /* ปรับให้มีอย่างน้อย 2 คอลัมน์ และยืดหยุ่นตามพื้นที่ */
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px; /* ลด gap */
+            margin-bottom: 15px;
+            justify-items: center;
+            width: 100%;
+        }
+
+        .image-slot {
+            width: 120px; /* ขนาดรูปภาพที่เล็กลง */
+            height: 100px; /* ขนาดรูปภาพที่เล็กลง */
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #f8f9fa;
+            background-size: cover;
+            background-position: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
+        
+        /* สไตล์สำหรับรูปภาพที่โหลดไม่สำเร็จ */
+        .image-slot::before {
+            content: "🚫 Image Load Error";
+            color: #e74c3c;
+            font-size: 0.7em;
+            text-align: center;
+            background-color: rgba(255, 255, 255, 0.8);
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 1; /* Ensure it's above content */
+        }
+
+        .image-slot.error-image::before {
+            opacity: 1;
+        }
+
+        .image-slot.drag-over {
+            border-color: #4facfe;
+            background-color: #e3f2fd;
+            transform: scale(1.02);
+        }
+
+        .image-slot.matched {
+            border-color: #4caf50;
+            background-color: #e8f5e8;
+        }
+
+        .image-slot.wrong-match { /* สไตล์สำหรับวางผิด */
+            border-color: #f44336;
+            background-color: #ffebee;
+            animation: shake 0.5s ease;
+        }
+
+
+        .image-slot .image-content {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            background-color: transparent; /* Changed to transparent */
+            transition: background-color 0.3s ease;
+            font-size: 0.8em; /* ฟอนต์เล็กลง */
+        }
+
+        .image-slot.matched .image-content {
+            background-color: transparent; /* เมื่อจับคู่ถูกให้พื้นหลังโปร่งใส */
+        }
+
+        .image-placeholder {
+            color: #666;
+            text-align: center;
+            padding: 5px;
+        }
+
+        .matched-word {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(76, 175, 80, 0.9);
+            color: white;
+            padding: 5px;
+            border-radius: 0 0 7px 7px;
+            font-size: 0.75em; /* ฟอนต์เล็กลง */
+            text-align: center;
+            font-weight: bold;
+            transform: translateY(100%);
+            animation: slideUp 0.3s forwards;
+        }
+
+        @keyframes slideUp {
+            to { transform: translateY(0); }
+        }
+
+        .words-container {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 15px;
+            border-radius: 15px;
+            border: 1px solid #e0e0e0;
+            margin-bottom: 15px;
+            display: flex;
+            flex-wrap: wrap; /* สำคัญ: ทำให้คำศัพท์ขึ้นบรรทัดใหม่ได้ */
+            justify-content: center; /* จัดให้อยู่กึ่งกลาง */
+            gap: 8px; /* ลด gap */
+            width: 100%;
+            min-height: 50px; /* เพิ่มความสูงขั้นต่ำเพื่อป้องกันการยุบ */
+        }
+
+        .word-item {
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            color: white;
+            padding: 8px 12px; /* ลด padding */
+            border-radius: 8px;
+            cursor: grab;
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.9em; /* ปรับขนาดฟอนต์ */
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            white-space: nowrap; /* ป้องกันไม่ให้คำศัพท์ตัดบรรทัด */
+        }
+
+        .word-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        .word-item.dragging {
+            opacity: 0.5;
+            transform: rotate(3deg);
+            cursor: grabbing;
+        }
+
+        .controls {
+            text-align: center;
+            margin-top: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 8px; /* ลด gap */
+            width: 100%;
+        }
+
+        button {
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            color: white;
+            border: none;
+            padding: 8px 15px; /* ลด padding */
+            font-size: 0.85em; /* ปรับขนาดฟอนต์ */
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .feedback {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 0.9em; /* ปรับขนาดฟอนต์ */
+            font-weight: bold;
+            min-height: 25px; /* กำหนดความสูงขั้นต่ำ */
+        }
+
+        .success {
+            color: #4caf50;
+            animation: bounce 0.5s ease;
+        }
+
+        .error {
+            color: #f44336;
+            animation: shake 0.5s ease;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-5px); }
+            60% { transform: translateY(-3px); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-3px); }
+            75% { transform: translateX(3px); }
+        }
+
+        .instructions {
+            background: #e3f2fd;
+            padding: 12px; /* ลด padding */
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 3px solid #2196f3;
+            font-size: 0.8em; /* ปรับขนาดฟอนต์ */
+        }
+
+        .instructions h3 {
+            margin-top: 0;
+            color: #1976d2;
+            font-size: 0.9em; /* ปรับขนาดฟอนต์ */
+        }
+
+        /* Responsive adjustments for smaller screens (e.g., iPhone SE) */
+        @media (max-width: 400px) {
+            h1 {
+                font-size: 1.5em;
+            }
+            .score-board, .controls {
+                flex-direction: column; /* ให้เรียงเป็นแนวตั้งบนจอบางเฉียบ */
+                gap: 5px;
+            }
+            .score-item, .timer-item, button { /* Include timer-item here */
+                width: 90%; /* ทำให้เต็มความกว้าง */
+                max-width: 250px; /* จำกัดความกว้าง */
+            }
+            .game-area {
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); /* รูปภาพเล็กลงอีกนิด */
+            }
+            .image-slot {
+                width: 100px;
+                height: 85px;
+            }
+            .word-item {
+                font-size: 0.8em;
+                padding: 6px 10px;
+            }
+        }
+
+        /* Styles for the login screen */
+        #loginScreen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 300px; /* Give it some height */
+            text-align: center;
+            padding: 20px;
+        }
+
+        #loginScreen h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        #loginScreen input[type="text"] {
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 1.1em;
+            margin-bottom: 20px;
+            text-align: center;
+            width: 80%;
+            max-width: 300px;
+            box-sizing: border-box;
+        }
+
+        #loginScreen button {
+            padding: 12px 25px;
+            font-size: 1.1em;
+            background: linear-gradient(45deg, #2ecc71, #3498db); /* Green-blue gradient */
+        }
+
+        /* Initially hide game content */
+        #gameContent {
+            display: none; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌍 Places & Travel Vocabulary Game</h1>
+            <p>Match the vocabulary words with their corresponding pictures!</p>
+        </div>
+
+        <div id="loginScreen">
+            <h2>Enter Your Name to Start!</h2>
+            <input type="text" id="playerNameInput" placeholder="Your Name">
+            <button id="startGameButton">Start Game</button>
+        </div>
+
+        <div id="gameContent">
+            <div class="instructions">
+                <h3>📝 How to Play:</h3>
+                <p>Drag the vocabulary words from **below the pictures** and drop them on the correct image. If wrong, the word disappears! Complete the game within **5 minutes** for the best score!</p>
+            </div>
+
+            <div class="score-board">
+                <div class="score-item">
+                    <span>Player: </span><span id="displayPlayerName">Guest</span>
+                </div>
+                <div class="score-item">
+                    <span>Score: </span><span id="score">0</span>
+                </div>
+                <div class="score-item">
+                    <span>Correct: </span><span id="correct">0</span>/<span id="total">17</span>
+                </div>
+                <div class="score-item">
+                    <span>Attempts: </span><span id="attempts">0</span>
+                </div>
+                <div class="timer-item">
+                    <span>Time: </span><span id="timer">00:00</span>
+                </div>
+            </div>
+
+            <div class="game-area" id="imagesList">
+            </div>
+
+            <div class="words-container" id="wordsList">
+            </div>
+
+            <div class="controls">
+                <button onclick="shuffleWords()">🔄 Shuffle Words</button>
+                <button onclick="resetGame()">🔄 Reset Game</button>
+                <button onclick="showHint()">💡 Need a Hint?</button>
+            </div>
+
+            <div class="feedback" id="feedback"></div>
+        </div>
+    </div>
+
+    <script>
+        // Vocabulary data - Please ensure these image URLs are direct links to images (ending in .jpg, .png, .gif, etc.)
+        const vocabularyData = [
+            {word: "arrival gate", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiWtYIRm5hpXn4M88hp9nKzHpoerpAUsI9tc6vUT3bh9M9jTPKwXFlkUJ5FVFtCTwQNKImSynur8teC6Rdr3IbA_nXvG6xnFG22-j8fgtQja7KuvkRnIsRtIBdi4iuNLSYuYiElJzrU9u1jOZZNzerE8js1ckXqRBAtfqmNzB-LdHve7NB66LYv-q6bkGH1/s320/Gemini_Generated_Image_7b99q37b99q37b99.png", hint: "Where passengers arrive at airports"},
+            {word: "ATM", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgx0cyiflGYQLEwzntGcy2hPjk2F1yGP-lDNzq-mNhWv1SCpPbNPUIXuJrwRGSYsmj2OBQEnv9wJqnCO7gZy1ZlgCCNihJouCqwO_Juh4wQRPYMFm-8K_ESJa2MFQPa0Kr11-n1rHTpS6ZWzMkG4PF8gYT87Vw066AUCxOSxBp4vYI99afzWSgYYv_Lk9HL/s320/Gemini_Generated_Image_3u3siu3u3siu3u3s.jpg", hint: "Machine for banking transactions"},
+            {word: "block", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgUADcUhiPP6SWRVC4SJoiVzZUyQ3x_bLSPCqqJwUFK79Yq8F-K7HB2vNjxIN6TJXwoRVTwnTkqKg4K6tPZCEpMwXYDcpneW99YEG9ejJgr_-QB9SnIXI5I_SY1PVnt1-b2seqUvbysEzSvdt1rPAFa459t_v00Zfpbzhkv-m_HqqSQh0ZIdBs3GB8uEgc3/s320/Gemini_Generated_Image_3u3sit3u3sit3u3s.jpg", hint: "A section of a city street"},
+            {word: "bridge", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgoQdmm_pC1IzWlWkfe0juMDbWGi9a6XYaPUQ147RJxreqieldQ3DxFuD3CWyv-LJ0vunvGJraN3NDzjBXNH8er8iLiYAXEF_L34c2l8ZTyAa0v6RNMlFyXwDdMzQ6ZMJFrYe9RLn9M1YiI9AakN4RAmlBB9KptRJee6Fw1NCkZqKRqlJwSr-Wmg81gLszJ/s320/Gemini_Generated_Image_3u3siw3u3siw3u3s.jpg", hint: "Structure that crosses over water or roads"},
+            {word: "castle", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgCh3S3Lt2wKpRghZ_hHrZkIu-HHWPkMXMN1I4MOs1w9G9jLJc43fN2G18QBlZu0Pbiv9yfW6_Y5X-8AUSix9YvhRoVAmdVIgxQ8UMr0vmqDMR3VvGzAMNt_pqyb8gDT4Hpu0qutTDTVuSkyNpCwnlmGaVJpbV0ch_-GTqQnzzJGKQW2OQCmW5QL422fdI8/s320/Gemini_Generated_Image_3u3sis3u3sis3u3s.jpg", hint: "Historic fortress or palace"},
+            {word: "corner", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjeaOwj5KNA2_m0M3dSTOwoJew6m_vy6EsF0w4dY2-5mrA_sWRI9Kaf5FdUn_rldzJhyphenhyphenYFxOz8IMQ4EeiAfjrCJ95xcvBulnut9d-D2gfJ-OeQYUii2qHDFBPMkEPu6ukursrQivaGA8qMR78LF0dRspFW0k5wfBeDiaPqp-TS2YKSeZM8faaf39NpzqbbJ/s320/Gemini_Generated_Image_z5mi0uz5mi0uz5mi.png", hint: "Where two streets meet"},
+            {word: "downtown", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiOkRaKw4H-Afs4QWH2QE_yxY4YVHU6nZMFryvISDwqjeDoqLLqyzvEktQxSNVfcjupcXqE7jtVh-YW5_xDnJpQAQ-JOGndmOu3l-ziwzkCejfxPJrkj-NVUgR4SsW9L0nWrpCEhdW9P6cNCRxAfEushAxhfFhq1YiRAkrNSz4A_6oPqLWTbRsbqzPBZ2eL/s320/Gemini_Generated_Image_es30jfes30jfes30.jpg", hint: "Central business district of a city"},
+            {word: "forest", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiOEcEHxRBMKzgsxvmD4ojGhm5__5HLhqbr2VMNZuH1ancNTV60AIXbgGiy0E47BYoaCB6gj9ybK0cA5tkz4xpNCgfjmBDzNBzaJruzZ2bpgUTZGeC9YDvgbpe2AvhSImGPGK07NcHuNcIkhnDH60o5-58nsBEtqksRg9ZBXEH-1QtyjQdOp4BfwowHagSq/s320/Gemini_Generated_Image_bmp43gbmp43gbmp4.jpg", hint: "Large area covered with trees"},
+            {word: "hostel", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhlZsbFIxvPYm4VwnBu9u_jx_a8utQzCdrMJyIDhRvSuJYj-9LV3xW5M5RkLtmCI7cSeqYiBykbm0pqFnD9CLOJW41BFjBHiVjLQV5q76_rW0sdmX4haPY422shjnXNgmVeHUmA3R-_gcL4F9-DmkZiTGX-R8hYf16TLwRhJypHDOtCjMaVMQ-m5wpH6PD9/s320/Gemini_Generated_Image_vghpkhvghpkhvghp.jpg", hint: "Budget accommodation for travelers"},
+            {word: "parking lot", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg5u__uzSPdV2-6rkbL7CP0JSc-GLhmEzMvsL6_guNUhBxXPNwbwqfgQ9e8mgS4B0mpqpqaef4LX_F9tDtULtHsWIPIGxaGRUfWIHvYqe_Vki_SyWToa_8KcM0nN1NJ2LmGOqDeQ3Jv9eui4EQ3a3AiFc3vWgQhj1sMUTZaufu8kQm7I1b4NrKnohD-TVcL/s320/Gemini_Generated_Image_xspcirxspcirxspc.png", hint: "Area for parking vehicles"},
+            {word: "post office", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg1ni4-YdOSiQFtjIXZmWRegCpDmzUUGuQXJAFITMvHUS8bXbtKHs_2x6nCkHj48BhR-L50hlfFKTJJnt3iXAMM1NJ_1bh_YTr1_5sS5V7y6G4Kk-4lzrPByLOQBaVcRmaqsIeThZ4Upn_x2c9-VtnS8CTTTxu4rulAO0cH3O4z80wZm5RNGMfdWn4RBIRI/s320/Gemini_Generated_Image_xqql0axqql0axqql.png", hint: "Where you send mail and packages"},
+            {word: "restroom", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEirfQ6fdBo1cTG7DdtZzH4JezlGNao3p1aWrIQB7F_DKnyquzVoTudDrYb85ot37KOxk5uWZsyfTgSkCWPp1DQ5TtOYpPCLTaWiOBarhlLXOdOcgyMbyJMFO2HgvG43BHQq3-J7THyukW4PDr1fWAlqOvgRQcI0aJB90FOOAzKPcoQr8NgV1pPz_FDp-KB8/s320/Gemini_Generated_Image_oy7oc4oy7oc4oy7o.png", hint: "Public toilet facility"},
+            {word: "river", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEimpur8AJOi5ey16xSXUxQ2cFukNTNRvEZ1UVU8GTpc6WMeFVgcqg0eWglYGK80oBsQ0L_iddpq6L0pfqJ3U7TIqIHX5ZEm8SdrQUV1jMtFZryVlrD0TDtgXYN6hXG5_-_e8rb7gu7O7OaG5kDhLowHlfJlRJtgDagx-ea3Y_e9YbsCU8P1_D1fyXAdyr0C/s320/Gemini_Generated_Image_hh0xe8hh0xe8hh0x.png", hint: "Natural flowing water"},
+            {word: "subway", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEinlHpN-JFmK2D0a8ejsliJQGp-PEIQ2lsYVRQik_yjv4ed3mUcBzaMkEMofFmq-tFhYvhY8qdKasSAb6hZdxMrzCdqWo4gHafzsJ-eiwMWR7B8UMVN2Chuh-wp_QP9AUAfPAzNLB5GxFJ2bO9G1ewyF1xbxAWRUD_D4uA89vxGEKn0O-3FCmEQ4NKA5rvb/s320/Gemini_Generated_Image_sbourfsbourfsbou.png", hint: "Underground train system"},
+            {word: "subway station", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjlxmckQEbvcgtsPmhdZqFJyZjwKkk0qhHFNUSa3dk6jnZPyALPapH54EI25aXw0cvWiffSgG_l5z-DF8Lvl9o6Be3K79yB1ngNPkNIC8Pwg1s-xKOhqpdCoEONtSawAyjWud28EAY-oGgq7dmH8Rm6rUM6tacYoWvQXb1cf26TUGBb3WiEFAEkxxILkVzq/s320/Gemini_Generated_Image_yibmueyibmueyibm.png", hint: "Where you catch the underground train"},
+            {word: "traffic lights", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiFeen0y4T6Jqox2SLD10fkIL2e7dAjz-UEjgm6628-VfVfyluqNlUjdN4qImS490v-x92FV-U9ccY7d-65zp0vSJL8656lzmD-eJt9PWBuMI0cUhdQrObN5fNuW47AntEdfh67P-60ETGROaDHJKX33eT04OCp-Uf6BdL1ucvsqoEFeQM5JDIM86c-cIA9/s320/Gemini_Generated_Image_vb23a7vb23a7vb23.png", hint: "Signals that control traffic flow"},
+            {word: "train station", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEidSHpMnBueYseE2qBbRISiR1yfnrshjDCh3elLKibz4pFrU1T4doKavR-lThYxUz5O4UOvW2YJiEjAQwoTMk4rM017lgUO00fUS0l92nmrJzvnFivgrj3tAsvWJpQfYGduRTQDCAC_heKCtZfWn3e0Xh16XvInA5SA2CwhUquAMvwABrnKXlpJdwitxb-T/s320/Gemini_Generated_Image_crb2akcrb2akcrb2.png", hint: "Where trains arrive and depart"}
+        ];
+
+        let gameState = {
+            score: 0,
+            correct: 0,
+            attempts: 0,
+            matches: new Set(),
+            shuffledWords: [],
+            currentHintIndex: 0,
+            timerInterval: null,
+            startTime: 0,
+            elapsedTime: 0,
+            gameEnded: false,
+            playerName: "Guest" // Default player name
+        };
+
+        const MAX_TIME_SECONDS = 300; // 5 minutes * 60 seconds/minute (Full time allowed)
+        // const MAX_SCORE_TIME_BASED = 300; // This constant is no longer relevant for the new scoring rule.
+
+        // Function to show the login screen
+        function showLoginScreen() {
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('gameContent').style.display = 'none';
+            document.getElementById('playerNameInput').value = ''; // Clear input on showing login screen
+            document.getElementById('playerNameInput').focus(); // Focus on the input field
+            gameState.playerName = "Guest"; // Reset player name when going back to login
+            updateScore(); // Update player name on scoreboard
+            showFeedback("", ""); // Clear any previous feedback
+        }
+
+        // Function to start the game after login
+        function startGame() {
+            const playerNameInput = document.getElementById('playerNameInput');
+            let playerName = playerNameInput.value.trim();
+
+            if (playerName === "") {
+                playerName = "Guest"; // Default to "Guest" if no name is entered
+            }
+            gameState.playerName = playerName;
+
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('gameContent').style.display = 'block'; // Or 'flex' if needed for layout
+
+            // Initialize game content
+            gameState.shuffledWords = [...vocabularyData];
+            shuffleArray(gameState.shuffledWords);
+            renderImages();
+            renderWords();
+            updateScore();
+            document.getElementById('total').textContent = vocabularyData.length;
+            
+            // Reset timer and start it
+            resetTimer();
+            startTimer();
+            gameState.gameEnded = false;
+            enableGameInteractions(true); // Enable interactions at start
+            showFeedback(`Welcome, ${gameState.playerName}! Drag words to match pictures! 🎉`, "success");
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function renderImages() {
+            const imagesList = document.getElementById('imagesList');
+            imagesList.innerHTML = '';
+
+            const shuffledImages = [...vocabularyData];
+            shuffleArray(shuffledImages); // สุ่มลำดับการแสดงรูปภาพ
+
+            shuffledImages.forEach((item) => {
+                const imageSlot = document.createElement('div');
+                imageSlot.className = 'image-slot';
+                imageSlot.dataset.word = item.word;
+                imageSlot.style.backgroundImage = `url(${item.image})`;
+
+                // เพิ่ม Event Listener สำหรับตรวจสอบการโหลดรูปภาพ
+                const img = new Image();
+                img.src = item.image;
+                img.onload = () => {
+                    imageSlot.classList.remove('error-image');
+                };
+                img.onerror = () => {
+                    imageSlot.classList.add('error-image'); // เพิ่ม class หากโหลดรูปภาพไม่สำเร็จ
+                    imageSlot.style.backgroundImage = 'none'; // ลบ background image ที่เสีย
+                };
+
+                const imageContent = document.createElement('div');
+                imageContent.className = 'image-content';
+
+                if (gameState.matches.has(item.word)) {
+                    imageSlot.classList.add('matched');
+                    imageContent.innerHTML = `<div class="matched-word">${item.word}</div>`;
+                    imageSlot.draggable = false; // ไม่ให้ลากถ้าจับคู่แล้ว
+                } else {
+                    imageContent.innerHTML = `<div class="image-placeholder"></div>`;
+                }
+
+                imageSlot.appendChild(imageContent);
+
+                imageSlot.addEventListener('dragover', handleDragOver);
+                imageSlot.addEventListener('drop', handleDrop);
+                imageSlot.addEventListener('dragleave', handleDragLeave);
+
+                imagesList.appendChild(imageSlot);
+            });
+        }
+
+        function renderWords() {
+            const wordsList = document.getElementById('wordsList');
+            wordsList.innerHTML = '';
+
+            gameState.shuffledWords.forEach((item) => {
+                if (!gameState.matches.has(item.word)) { // แสดงเฉพาะคำที่ยังไม่ถูกจับคู่
+                    const wordElement = document.createElement('div');
+                    wordElement.className = 'word-item';
+                    wordElement.textContent = item.word;
+                    wordElement.draggable = true;
+                    wordElement.dataset.word = item.word;
+
+                    wordElement.addEventListener('dragstart', handleDragStart);
+                    wordElement.addEventListener('dragend', handleDragEnd);
+
+                    wordsList.appendChild(wordElement);
+                }
+            });
+            // If there are no more words to drag (all matched), show feedback.
+            if (wordsList.children.length === 0 && gameState.matches.size < vocabularyData.length && !gameState.gameEnded) {
+                showFeedback("No more words to drag. Reset the game to try again! 😢", "error");
+            }
+        }
+
+        function handleDragStart(e) {
+            if (gameState.gameEnded) { // Prevent dragging if game ended
+                e.preventDefault();
+                return;
+            }
+            e.dataTransfer.setData('text/plain', e.target.dataset.word);
+            e.target.classList.add('dragging');
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            if (!e.currentTarget.classList.contains('matched') && !gameState.gameEnded) {
+                e.currentTarget.classList.add('drag-over');
+            }
+        }
+
+        function handleDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const imageSlot = e.currentTarget;
+            imageSlot.classList.remove('drag-over');
+
+            if (gameState.gameEnded) { // Prevent dropping if game ended
+                showFeedback("The game is over! Please reset to play again. 🎮", "error");
+                return;
+            }
+
+            if (imageSlot.classList.contains('matched')) {
+                showFeedback("This image is already matched! Try another one. 😊", "error");
+                return;
+            }
+
+            const draggedWord = e.dataTransfer.getData('text/plain');
+            const targetWord = imageSlot.dataset.word;
+
+            gameState.attempts++; // Increment attempts on any drop
+
+            const wordElementToRemove = document.querySelector(`.word-item[data-word="${draggedWord}"]`);
+
+            if (draggedWord === targetWord) {
+                gameState.matches.add(draggedWord);
+                gameState.correct++;
+                showFeedback("Excellent! Correct match! 🎉", "success");
+
+                imageSlot.classList.add('matched');
+                const imageContent = imageSlot.querySelector('.image-content');
+                if (imageContent) {
+                    imageContent.innerHTML = `<div class="matched-word">${draggedWord}</div>`;
+                }
+
+                if (wordElementToRemove) {
+                    wordElementToRemove.remove();
+                }
+
+                if (gameState.matches.size === vocabularyData.length) {
+                    endGame(true); // Game completed successfully
+                }
+            } else {
+                showFeedback("Oops! That's not the right match. 🤔", "error");
+
+                imageSlot.classList.add('wrong-match');
+                setTimeout(() => {
+                    imageSlot.classList.remove('wrong-match');
+                }, 700); 
+            }
+
+            renderWords();
+        }
+
+        function showFeedback(message, type) {
+            const feedback = document.getElementById('feedback');
+            feedback.textContent = message;
+            feedback.className = `feedback ${type}`;
+
+            setTimeout(() => {
+                if (feedback.textContent === message) { 
+                    feedback.textContent = '';
+                    feedback.className = 'feedback';
+                }
+            }, 3000);
+        }
+
+        function updateScore() {
+            document.getElementById('score').textContent = gameState.score; 
+            document.getElementById('correct').textContent = gameState.correct;
+            document.getElementById('attempts').textContent = gameState.attempts;
+            document.getElementById('displayPlayerName').textContent = gameState.playerName; 
+        }
+
+        function shuffleWords() {
+            if (gameState.gameEnded) {
+                showFeedback("Game over! Reset to shuffle and play again.", "error");
+                return;
+            }
+            const unmatchedWords = vocabularyData.filter(item => !gameState.matches.has(item.word));
+            gameState.shuffledWords = [...unmatchedWords];
+            shuffleArray(gameState.shuffledWords);
+            renderWords();
+            showFeedback("Words shuffled! 🔄", "success");
+        }
+
+        function resetGame() {
+            stopTimer();
+            gameState = {
+                score: 0, 
+                correct: 0,
+                attempts: 0,
+                matches: new Set(),
+                shuffledWords: [],
+                currentHintIndex: 0,
+                timerInterval: null,
+                startTime: 0,
+                elapsedTime: 0,
+                gameEnded: false,
+                playerName: "Guest" 
+            };
+            
+            showLoginScreen(); // Go back to login screen after reset
+        }
+
+        function showHint() {
+            if (gameState.gameEnded) {
+                showFeedback("Game over! Reset to play again.", "error");
+                return;
+            }
+            const unmatched = vocabularyData.filter(item => !gameState.matches.has(item.word));
+            if (unmatched.length === 0) {
+                showFeedback("You've matched everything! Great job! 🎉", "success");
+                return;
+            }
+
+            const hintItem = unmatched[0]; 
+            showFeedback(`💡 Hint for "${hintItem.word}": ${hintItem.hint}`, "success");
+        }
+
+        // --- Timer Functions ---
+        function startTimer() {
+            if (gameState.timerInterval) clearInterval(gameState.timerInterval); 
+            gameState.startTime = Date.now() - (gameState.elapsedTime * 1000); 
+            gameState.timerInterval = setInterval(updateTimer, 1000); 
+        }
+
+        function stopTimer() {
+            clearInterval(gameState.timerInterval);
+            gameState.timerInterval = null;
+        }
+
+        function resetTimer() {
+            stopTimer();
+            gameState.elapsedTime = 0;
+            displayTime(0);
+        }
+
+        function updateTimer() {
+            const now = Date.now();
+            gameState.elapsedTime = Math.floor((now - gameState.startTime) / 1000);
+
+            if (gameState.elapsedTime >= MAX_TIME_SECONDS) {
+                endGame(false); // Time's up
+            } else {
+                displayTime(gameState.elapsedTime);
+            }
+        }
+
+        function displayTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            const formattedTime = `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+            document.getElementById('timer').textContent = formattedTime;
+        }
+        
+        function enableGameInteractions(enable) {
+            const wordsList = document.getElementById('wordsList');
+            const imagesList = document.getElementById('imagesList');
+            const buttons = document.querySelectorAll('.controls button');
+
+            if (enable) {
+                wordsList.style.pointerEvents = 'auto';
+                imagesList.style.pointerEvents = 'auto';
+                buttons.forEach(button => button.disabled = false);
+            } else {
+                wordsList.style.pointerEvents = 'none';
+                imagesList.style.pointerEvents = 'none';
+                buttons.forEach(button => button.disabled = true);
+            }
+        }
+
+        function endGame(completedSuccessfully) {
+            stopTimer();
+            gameState.gameEnded = true;
+            enableGameInteractions(false); // Disable further interactions
+
+            const finalTime = gameState.elapsedTime;
+            let finalScore = 0; 
+
+            let message = "";
+            let feedbackType = "";
+
+            if (completedSuccessfully) {
+                // Score = MAX(0, 300 - time taken (seconds))
+                finalScore = Math.max(0, MAX_TIME_SECONDS - finalTime); 
+                gameState.score = finalScore; 
+
+                message = `🎊 Congratulations, ${gameState.playerName}! You've completed the game in ${displayFormattedTime(finalTime)}! Your final score is ${finalScore}! 🎉`;
+                feedbackType = "success";
+            } else {
+                // If game ended due to time out, the score is calculated based on time, and capped at 0.
+                finalScore = Math.max(0, MAX_TIME_SECONDS - finalTime); 
+                gameState.score = finalScore; 
+
+                message = `⏰ Time's up, ${gameState.playerName}! You completed ${gameState.correct} out of ${vocabularyData.length} matches. Your final score is ${finalScore}. Better luck next time!`;
+                feedbackType = "error";
+            }
+            showFeedback(message, feedbackType);
+            updateScore(); 
+        }
+
+        function displayFormattedTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${minutes} minute(s) and ${remainingSeconds} second(s)`;
+        }
+
+        // Event listener for the "Start Game" button
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('startGameButton').addEventListener('click', startGame);
+            document.getElementById('playerNameInput').addEventListener('keypress', (event) => {
+                if (event.key === 'Enter') {
+                    startGame();
+                }
+            });
+            showLoginScreen(); // Show login screen on page load
+        });
+    </script>
+</body>
+</html>
